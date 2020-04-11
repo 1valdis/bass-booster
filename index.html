@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bass b00ster in browser</title>
+    <style>
+      label,
+      input[type="file"] {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <input type="file" id="input" accept="audio/*" />
+    <audio id="preview" controls></audio>
+    <label
+      >Frequency:
+      <input
+        type="number"
+        min="1"
+        max="11025"
+        step="10"
+        value="230"
+        id="frequency"
+    /></label>
+    <label
+      >Detune:
+      <input
+        type="number"
+        min="0"
+        max="2000"
+        step="any"
+        value="650"
+        id="detune"
+    /></label>
+    <label
+      >Q:
+      <input type="number" min="0.0001" max="1000" step="any" value="1" id="q"
+    /></label>
+    <label
+      >Gain:
+      <input type="number" min="-40" max="40" step="any" value="18" id="gain"
+    /></label>
+    <label for="">Type</label>
+    <select id="type">
+      <option>lowpass</option>
+      <option>highpass</option>
+      <option>bandpass</option>
+      <option selected>lowshelf</option>
+      <option>highshelf</option>
+      <option>peaking</option>
+      <option>notch</option>
+      <option>allpass</option>
+    </select>
+    <!-- <select id="preset"> </select> -->
+    <script>
+      const $ = (id) => document.getElementById(id);
+
+      const previewAudio = $("preview");
+      const fileInput = $("input");
+      const typeSelect = $("type"); // lowshelf
+      const frequencyInput = $("frequency"); // 230
+      const detuneInput = $("detune"); // 650
+      const qInput = $("q"); // 63
+      const gainInput = $("gain"); // 18
+
+      const ctx = new AudioContext();
+      const previewNode = ctx.createMediaElementSource(
+        document.getElementById("preview")
+      );
+      const filterNode = ctx.createBiquadFilter();
+      filterNode.type = "lowshelf";
+      filterNode.frequency.value = 230;
+      filterNode.detune.value = 650;
+      filterNode.gain.value = 18;
+      previewNode.connect(filterNode);
+      filterNode.connect(ctx.destination);
+
+      fileInput.addEventListener("change", (e) => {
+        if (!e.target.files.length) return;
+        if (previewAudio.src) {
+          URL.revokeObjectURL(previewAudio.src);
+        }
+        previewAudio.src = URL.createObjectURL(e.target.files[0]);
+        ctx.resume();
+      });
+      typeSelect.addEventListener("change", () => {
+        filterNode.type = typeSelect.options[typeSelect.selectedIndex].value;
+      });
+      frequencyInput.addEventListener("input", () => {
+        filterNode.frequency.value = +frequencyInput.value;
+      });
+      detuneInput.addEventListener("input", () => {
+        filterNode.detune.value = +detuneInput.value;
+      });
+      qInput.addEventListener("input", () => {
+        filterNode.Q.value = +qInput.value;
+      });
+      gainInput.addEventListener("input", () => {
+        filterNode.gain.value = +gainInput.value;
+      });
+    </script>
+  </body>
+</html>
