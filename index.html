@@ -10,7 +10,8 @@
         padding: 0;
       }
       input[type="file"],
-      audio {
+      audio,
+      button {
         grid-column: 1 / -1;
       }
       body {
@@ -22,6 +23,9 @@
       }
       body * {
         max-width: 100%;
+      }
+      .hidden {
+        display: none;
       }
     </style>
   </head>
@@ -37,7 +41,9 @@
       value="230"
       id="frequency"
     />
-    <label for="detune">Detune:</label>
+    <label for="gain">Gain: </label>
+    <input type="number" min="-40" max="40" step="any" value="18" id="gain" />
+    <label for="detune" class="hidden">Detune:</label>
     <input
       type="number"
       min="0"
@@ -45,13 +51,20 @@
       step="any"
       value="650"
       id="detune"
+      class="hidden"
     />
-    <label for="q">Q: </label>
-    <input type="number" min="0.0001" max="1000" step="any" value="1" id="q" />
-    <label for="gain">Gain: </label>
-    <input type="number" min="-40" max="40" step="any" value="18" id="gain" />
-    <label for="">Type</label>
-    <select id="type">
+    <label for="q" class="hidden">Q: </label>
+    <input
+      type="number"
+      min="0.0001"
+      max="1000"
+      step="any"
+      value="1"
+      id="q"
+      class="hidden"
+    />
+    <label for="type" class="hidden">Type</label>
+    <select id="type" class="hidden">
       <option>lowpass</option>
       <option>highpass</option>
       <option>bandpass</option>
@@ -61,17 +74,22 @@
       <option>notch</option>
       <option>allpass</option>
     </select>
+    <button id="advanced">Advanced mode</button>
     <!-- <select id="preset"> </select> -->
     <script>
       const $ = (id) => document.getElementById(id);
 
       const previewAudio = $("preview");
       const fileInput = $("input");
+      const typeLabel = document.querySelector('label[for="type"]');
       const typeSelect = $("type"); // lowshelf
       const frequencyInput = $("frequency"); // 230
+      const detuneLabel = document.querySelector('label[for="detune"]');
       const detuneInput = $("detune"); // 650
+      const qLabel = document.querySelector('label[for="q"]');
       const qInput = $("q"); // 63
       const gainInput = $("gain"); // 18
+      const advancedButton = $("advanced");
 
       const ctx = new AudioContext();
       const previewNode = ctx.createMediaElementSource(
@@ -108,6 +126,18 @@
       gainInput.addEventListener("input", () => {
         filterNode.gain.value = +gainInput.value;
       });
+      advancedButton.addEventListener("click", toggleAdvancedMode);
+
+      function toggleAdvancedMode() {
+        [
+          detuneLabel,
+          detuneInput,
+          qLabel,
+          qInput,
+          typeLabel,
+          typeLabel,
+        ].forEach((el) => el.classList.toggle("hidden"));
+      }
     </script>
   </body>
 </html>
