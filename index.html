@@ -14,10 +14,11 @@
       button,
       output {
         grid-column: 1 / -1;
+        min-width: 100%;
       }
       body {
         display: grid;
-        width: 10rem;
+        width: 30rem;
         grid: auto-flow / repeat(2, 1fr);
         gap: 1rem;
         padding: 1rem;
@@ -33,7 +34,7 @@
   <body>
     <input type="file" id="input" accept="audio/*" />
     <audio id="preview" controls></audio>
-    <label for="frequency">Frequency:</label>
+    <label for="frequency">Frequency of bass (less or equal):</label>
     <input
       type="number"
       min="1"
@@ -42,8 +43,8 @@
       value="230"
       id="frequency"
     />
-    <label for="gain">Gain: </label>
-    <input type="number" min="-40" max="40" step="any" value="18" id="gain" />
+    <label for="gain">Amplification (dB): </label>
+    <input type="number" min="0" max="40" step="any" value="18" id="gain" />
     <label for="detune" class="hidden">Detune:</label>
     <input
       type="number"
@@ -159,7 +160,7 @@
         if (!fileInput.files.length) return;
         const reader = new FileReader();
         reader.readAsArrayBuffer(fileInput.files[0]);
-        yield "Decoding buffer";
+        yield "Decoding audio";
         const buffer = await new Promise((resolve) => {
           reader.addEventListener("load", (e) => {
             resolve(ctx.decodeAudioData(e.target.result));
@@ -181,8 +182,9 @@
         filterNode.gain.value = +gainInput.value;
         bufferNode.connect(filterNode);
         filterNode.connect(offlineCtx.destination);
-        yield "Rendering audio";
+        yield "Applying filter";
         const resultingBuffer = await offlineCtx.startRendering();
+        yield "Encoding WAV";
         const waveBlob = audioBufferToWave(resultingBuffer);
         const a = document.createElement("a");
         a.href = URL.createObjectURL(waveBlob);
