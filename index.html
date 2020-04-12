@@ -11,7 +11,8 @@
       }
       input[type="file"],
       audio,
-      button {
+      button,
+      output {
         grid-column: 1 / -1;
       }
       body {
@@ -75,6 +76,9 @@
       <option>allpass</option>
     </select>
     <button id="advanced">Advanced mode</button>
+    <button id="savewav">Save as WAV</button>
+    <output id="saving"></output>
+
     <!-- <select id="preset"> </select> -->
     <script>
       const $ = (id) => document.getElementById(id);
@@ -90,6 +94,8 @@
       const qInput = $("q"); // 63
       const gainInput = $("gain"); // 18
       const advancedButton = $("advanced");
+      const saveWavButton = $("savewav");
+      const savingOutput = $("saving");
 
       const ctx = new AudioContext();
       const previewNode = ctx.createMediaElementSource(
@@ -127,6 +133,16 @@
         filterNode.gain.value = +gainInput.value;
       });
       advancedButton.addEventListener("click", toggleAdvancedMode);
+      saveWavButton.addEventListener("click", async () => {
+        try {
+          for await (const status of saveWav()) {
+            savingOutput.innerText = status;
+          }
+        } catch (e) {
+          console.log(e);
+          savingOutput.innerText = "Error :(";
+        }
+      });
 
       function toggleAdvancedMode() {
         [
@@ -137,6 +153,104 @@
           typeLabel,
           typeLabel,
         ].forEach((el) => el.classList.toggle("hidden"));
+      }
+
+      async function* saveWav() {
+        if (!fileInput.files.length) return;
+        const reader = new FileReader();
+        reader.readAsArrayBuffer(fileInput.files[0]);
+        yield "Decoding buffer";
+        const buffer = await new Promise((resolve) => {
+          reader.addEventListener("load", (e) => {
+            resolve(ctx.decodeAudioData(e.target.result));
+          });
+        });
+        const offlineCtx = new OfflineAudioContext({
+          numberOfChannels: buffer.numberOfChannels,
+          sampleRate: buffer.sampleRate,
+          length: buffer.length,
+        });
+        const bufferNode = offlineCtx.createBufferSource();
+        bufferNode.buffer = buffer;
+        bufferNode.start();
+        const filterNode = offlineCtx.createBiquadFilter();
+        filterNode.type = typeSelect.options[typeSelect.selectedIndex].value;
+        filterNode.frequency.value = +frequencyInput.value;
+        filterNode.detune.value = +detuneInput.value;
+        filterNode.Q.value = +qInput.value;
+        filterNode.gain.value = +gainInput.value;
+        bufferNode.connect(filterNode);
+        filterNode.connect(offlineCtx.destination);
+        yield "Rendering audio";
+        const resultingBuffer = await offlineCtx.startRendering();
+        const waveBlob = audioBufferToWave(resultingBuffer);
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(waveBlob);
+        a.download = fileInput.files[0].name + "-bass-b00sted.wav";
+        a.click();
+        URL.revokeObjectURL(a.href);
+        yield "Success";
+      }
+
+      function audioBufferToWave(audioBuffer) {
+        const length =
+          audioBuffer.length * audioBuffer.numberOfChannels * 2 + 44;
+        const arrayBuffer = new ArrayBuffer(length);
+        const view = new DataView(arrayBuffer);
+
+        var channels = [];
+
+        let pos = 0;
+
+        // write WAVE header
+        setUint32(0x46464952); // "RIFF"
+        setUint32(length - 8); // file length - 8
+        setUint32(0x45564157); // "WAVE"
+
+        setUint32(0x20746d66); // "fmt " chunk
+        setUint32(16); // length = 16
+        setUint16(1); // PCM (uncompressed)
+        setUint16(audioBuffer.numberOfChannels);
+        setUint32(audioBuffer.sampleRate);
+        setUint32(audioBuffer.sampleRate * 2 * audioBuffer.numberOfChannels); // avg. bytes/sec
+        setUint16(audioBuffer.numberOfChannels * 2); // block-align
+        setUint16(16); // 16 bits per sample
+
+        setUint32(0x61746164); // "data" - chunk
+        setUint32(length - pos - 4); // data size: file size - 44 bytes
+
+        // split channels
+        for (let i = 0; i < audioBuffer.numberOfChannels; i++) {
+          channels.push(audioBuffer.getChannelData(i));
+        }
+
+        // write interleaved
+        let offset = 0;
+        while (pos < length) {
+          for (let i = 0; i < audioBuffer.numberOfChannels; i++) {
+            // interleave channels
+            let sample = Math.max(-1, Math.min(1, channels[i][offset])); // clamp
+            // let sample = channels[i][offset];
+            sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0; // scale to 16-bit signed int (???)
+            // sample *= 32768;
+            view.setInt16(pos, sample, true); // update data chunk
+            pos += 2;
+          }
+          offset++; // next source sample
+        }
+
+        // create Blob
+        return new Blob([arrayBuffer], { type: "audio/wav" });
+
+        function setUint16(data) {
+          view.setUint16(pos, data, true);
+          pos += 2;
+        }
+
+        function setUint32(data) {
+          view.setUint32(pos, data, true);
+          pos += 4;
+        }
       }
     </script>
   </body>
