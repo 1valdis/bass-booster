@@ -5,43 +5,51 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Bass b00ster in browser</title>
     <style>
-      label,
-      input[type="file"] {
-        display: block;
+      * {
+        margin: 0;
+        padding: 0;
+      }
+      input[type="file"],
+      audio {
+        grid-column: 1 / -1;
+      }
+      body {
+        display: grid;
+        width: 10rem;
+        grid: auto-flow / repeat(2, 1fr);
+        gap: 1rem;
+        padding: 1rem;
+      }
+      body * {
+        max-width: 100%;
       }
     </style>
   </head>
   <body>
     <input type="file" id="input" accept="audio/*" />
     <audio id="preview" controls></audio>
-    <label
-      >Frequency:
-      <input
-        type="number"
-        min="1"
-        max="11025"
-        step="10"
-        value="230"
-        id="frequency"
-    /></label>
-    <label
-      >Detune:
-      <input
-        type="number"
-        min="0"
-        max="2000"
-        step="any"
-        value="650"
-        id="detune"
-    /></label>
-    <label
-      >Q:
-      <input type="number" min="0.0001" max="1000" step="any" value="1" id="q"
-    /></label>
-    <label
-      >Gain:
-      <input type="number" min="-40" max="40" step="any" value="18" id="gain"
-    /></label>
+    <label for="frequency">Frequency:</label>
+    <input
+      type="number"
+      min="1"
+      max="11025"
+      step="10"
+      value="230"
+      id="frequency"
+    />
+    <label for="detune">Detune:</label>
+    <input
+      type="number"
+      min="0"
+      max="2000"
+      step="any"
+      value="650"
+      id="detune"
+    />
+    <label for="q">Q: </label>
+    <input type="number" min="0.0001" max="1000" step="any" value="1" id="q" />
+    <label for="gain">Gain: </label>
+    <input type="number" min="-40" max="40" step="any" value="18" id="gain" />
     <label for="">Type</label>
     <select id="type">
       <option>lowpass</option>
