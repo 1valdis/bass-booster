@@ -16,14 +16,14 @@
         grid-column: 1 / -1;
         min-width: 100%;
       }
-      body {
+      .settings {
         display: grid;
         width: 30rem;
         grid: auto-flow / repeat(2, 1fr);
         gap: 1rem;
         padding: 1rem;
       }
-      body * {
+      .settings * {
         max-width: 100%;
       }
       .hidden {
@@ -32,53 +32,58 @@
     </style>
   </head>
   <body>
-    <input type="file" id="input" accept="audio/*" />
-    <audio id="preview" controls></audio>
-    <label for="frequency">Frequency of bass (less or equal):</label>
-    <input
-      type="number"
-      min="1"
-      max="11025"
-      step="10"
-      value="230"
-      id="frequency"
-    />
-    <label for="gain">Amplification (dB): </label>
-    <input type="number" min="0" max="40" step="any" value="18" id="gain" />
-    <label for="detune" class="hidden">Detune:</label>
-    <input
-      type="number"
-      min="0"
-      max="2000"
-      step="any"
-      value="650"
-      id="detune"
-      class="hidden"
-    />
-    <label for="q" class="hidden">Q: </label>
-    <input
-      type="number"
-      min="0.0001"
-      max="1000"
-      step="any"
-      value="1"
-      id="q"
-      class="hidden"
-    />
-    <label for="type" class="hidden">Type</label>
-    <select id="type" class="hidden">
-      <option>lowpass</option>
-      <option>highpass</option>
-      <option>bandpass</option>
-      <option selected>lowshelf</option>
-      <option>highshelf</option>
-      <option>peaking</option>
-      <option>notch</option>
-      <option>allpass</option>
-    </select>
-    <button id="advanced">Advanced mode</button>
-    <button id="savewav">Save as WAV</button>
-    <output id="saving"></output>
+    <section class="settings">
+      <input type="file" id="input" accept="audio/*" />
+      <audio id="preview" controls></audio>
+      <label for="frequency">Frequency of bass (less or equal):</label>
+      <input
+        type="number"
+        min="1"
+        max="11025"
+        step="10"
+        value="230"
+        id="frequency"
+      />
+      <label for="gain">Amplification (dB): </label>
+      <input type="number" min="0" max="40" step="any" value="18" id="gain" />
+      <label for="detune" class="hidden">Detune:</label>
+      <input
+        type="number"
+        min="0"
+        max="2000"
+        step="any"
+        value="650"
+        id="detune"
+        class="hidden"
+      />
+      <label for="q" class="hidden">Q: </label>
+      <input
+        type="number"
+        min="0.0001"
+        max="1000"
+        step="any"
+        value="1"
+        id="q"
+        class="hidden"
+      />
+      <label for="type" class="hidden">Type</label>
+      <select id="type" class="hidden">
+        <option>lowpass</option>
+        <option>highpass</option>
+        <option>bandpass</option>
+        <option selected>lowshelf</option>
+        <option>highshelf</option>
+        <option>peaking</option>
+        <option>notch</option>
+        <option>allpass</option>
+      </select>
+      <button id="advanced">Advanced mode</button>
+      <button id="savewav">Save as WAV</button>
+      <output id="saving"></output>
+    </section>
+    <section class="frequency">
+      <canvas id="frequencygraph" width="512" height="256"></canvas>
+    </section>
 
     <!-- <select id="preset"> </select> -->
     <script>
@@ -109,6 +114,11 @@
         filterNode.detune.value = 650;
         filterNode.gain.value = 18;
         previewNode.connect(filterNode);
+        const analyserNode = ctx.createAnalyser();
+        analyserNode.smoothingTimeConstant = 0.5;
+        analyserNode.fftSize = 1024;
+        analyserNode.maxDecibels = 0;
+
         if (ctx.audioWorklet) {
           const workletCode = `
             class ClampProcessor extends AudioWorkletProcessor {
@@ -120,7 +130,7 @@
                     }
                   }
                 }
-                
+
                 return true;
               }
             }
@@ -134,9 +144,11 @@
           const clampNode = new AudioWorkletNode(ctx, "clamp-processor");
           clampNode.onprocessorerror = console.log;
           filterNode.connect(clampNode);
-          clampNode.connect(ctx.destination);
+          clampNode.connect(analyserNode);
+          analyserNode.connect(ctx.destination);
         } else {
-          filterNode.connect(ctx.destination);
+          filterNode.connect(analyserNode);
+          analyserNode.connect(ctx.destination);
         }
 
         fileInput.addEventListener("change", (e) => {
@@ -283,6 +295,35 @@
             pos += 4;
           }
         }
+        const canvas = $("frequencygraph");
+        const canvasCtx = canvas.getContext("2d");
+        function startUpdatingGraph() {
+          requestAnimationFrame(() => {
+            const frequencyData = new Uint8Array(
+              analyserNode.frequencyBinCount
+            );
+            analyserNode.getByteFrequencyData(frequencyData);
+            const imageData = new ImageData(canvas.width, canvas.height);
+            const buffer = new ArrayBuffer(imageData.data.length);
+            const buf8 = new Uint8ClampedArray(buffer);
+            const data = new Uint32Array(buffer);
+
+            for (let i = 0; i < frequencyData.length; i++) {
+              const value = frequencyData[i];
+              data[frequencyData.length * (255 - value) + i] =
+                (255 << 24) | // alpha
+                (255 << 16) | // blue
+                (0 << 8) | // green
+                0; // red
+            }
+
+            imageData.data.set(buf8);
+            canvasCtx.putImageData(imageData, 0, 0);
+
+            requestAnimationFrame(startUpdatingGraph);
+          });
+        }
+        startUpdatingGraph();
       })();
     </script>
   </body>
