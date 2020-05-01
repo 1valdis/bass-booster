@@ -14,8 +14,7 @@ Ideally:
 
 - [ ] Solve Firefox preview issue? ([#1][i1])
 - [x] Realtime frequency graph
-- [ ] Bass boost specific part of file ?
-- [ ] Save as MP3
+- [x] Save as MP3
 
 ## Notes
 

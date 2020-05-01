@@ -78,7 +78,8 @@
         <option>allpass</option>
       </select>
       <button id="advanced">Advanced mode</button>
-      <button id="savewav">Save as WAV</button>
+      <button id="savewav">Save as WAV (fast)</button>
+      <button id="savemp3">Save as MP3 (slow)</button>
       <output id="saving"></output>
     </section>
     <section class="frequency">
@@ -102,12 +103,11 @@
         const gainInput = $("gain"); // 18
         const advancedButton = $("advanced");
         const saveWavButton = $("savewav");
+        const saveMp3Button = $("savemp3");
         const savingOutput = $("saving");
 
         const ctx = new AudioContext();
-        const previewNode = ctx.createMediaElementSource(
-          document.getElementById("preview")
-        );
+        const previewNode = ctx.createMediaElementSource(previewAudio);
         const filterNode = ctx.createBiquadFilter();
         filterNode.type = "lowshelf";
         filterNode.frequency.value = 230;
@@ -185,6 +185,16 @@
             savingOutput.innerText = "Error :(";
           }
         });
+        saveMp3Button.addEventListener("click", async () => {
+          try {
+            for await (const status of saveMp3()) {
+              savingOutput.innerText = status;
+            }
+          } catch (e) {
+            console.log(e);
+            savingOutput.innerText = "Error :(";
+          }
+        });
 
         function toggleAdvancedMode() {
           [
@@ -197,16 +207,17 @@
           ].forEach((el) => el.classList.toggle("hidden"));
         }
 
-        async function* saveWav() {
-          if (!fileInput.files.length) return;
+        async function decodeAudio() {
           const reader = new FileReader();
           reader.readAsArrayBuffer(fileInput.files[0]);
-          yield "Decoding audio";
-          const buffer = await new Promise((resolve) => {
+          return new Promise((resolve) => {
             reader.addEventListener("load", (e) => {
               resolve(ctx.decodeAudioData(e.target.result));
             });
           });
+        }
+
+        async function applyFilterToBuffer(buffer) {
           const offlineCtx = new OfflineAudioContext({
             numberOfChannels: buffer.numberOfChannels,
             sampleRate: buffer.sampleRate,
@@ -223,15 +234,111 @@
           filterNode.gain.value = +gainInput.value;
           bufferNode.connect(filterNode);
           filterNode.connect(offlineCtx.destination);
-          yield "Applying filter";
-          const resultingBuffer = await offlineCtx.startRendering();
-          yield "Encoding WAV";
-          const waveBlob = audioBufferToWave(resultingBuffer);
+          return offlineCtx.startRendering();
+        }
+
+        function downloadBlob(blob, type) {
           const a = document.createElement("a");
-          a.href = URL.createObjectURL(waveBlob);
-          a.download = fileInput.files[0].name + "-bass-b00sted.wav";
+          a.href = URL.createObjectURL(blob);
+          a.download = `${fileInput.files[0].name}-bass-b00sted.${type}`;
           a.click();
           URL.revokeObjectURL(a.href);
+        }
+
+        async function* saveWav() {
+          if (!fileInput.files.length) return;
+          yield "Decoding audio";
+          const buffer = await decodeAudio();
+          yield "Applying filter";
+          const resultingBuffer = await applyFilterToBuffer(buffer);
+          yield "Encoding WAV";
+          const waveBlob = await Promise.resolve(
+            audioBufferToWave(resultingBuffer)
+          );
+          downloadBlob(waveBlob, "wav");
+          yield "Success";
+        }
+
+        // function timeToSeconds(string) {
+        //   const parts = string.split(":");
+        //   return (
+        //     60 * 60 * +parts[0] + 60 * +parts[1] + parts[2] + 0.01 * parts[3]
+        //   );
+        // }
+
+        async function* saveMp3() {
+          if (!fileInput.files.length) return;
+          let durationSeconds;
+          const worker = new Worker("./ffmpeg-worker-mp4.js");
+          const readyPromise = new Promise((resolve) => {
+            worker.addEventListener("message", (event) => {
+              if (event.data.type === "ready") {
+                return resolve();
+              }
+              if (event.data.type === "stderr") {
+                return console.log(event.data.data);
+                // const durationInOutput = /Duration: ([^,]*)/.exec(
+                //   event.data.data
+                // );
+                // if (durationInOutput && durationInOutput[1])
+                //   durationSeconds = timeToSeconds(durationInOutput[1]);
+                // const progressInOutput = /time=([^ ]*)/.exec(
+                //   event.data.data
+                // );
+                // if (progressInOutput && progressInOutput[1]) {
+                //   progressSeconds = timeToSeconds(progressInOutput[1]);
+                //   yield `Encoding MP3 (${Math.floor(
+                //     (progressSeconds / durationSeconds) * 100
+                //   )}%)`;
+                // }
+              }
+              console.log(event);
+            });
+          });
+          yield "Decoding audio";
+          const buffer = await decodeAudio();
+          yield "Applying filter";
+          const resultingBuffer = await applyFilterToBuffer(buffer);
+          yield "Encoding WAV for conversion";
+          const waveBlob = await Promise.resolve(
+            audioBufferToWave(resultingBuffer)
+          );
+          const arrayBuffer = await waveBlob.arrayBuffer();
+          yield "Setting up mp3 encoder (once)";
+          await readyPromise;
+          yield "Encoding MP3";
+          const arguments = [
+            "-i",
+            "input",
+            "-ab",
+            "320k",
+            "-ar",
+            "44100",
+            "-ac",
+            "2",
+            "-acodec",
+            "libmp3lame",
+            "output.mp3",
+          ];
+          worker.postMessage({
+            type: "run",
+            arguments,
+            MEMFS: [
+              {
+                data: new Uint8Array(arrayBuffer),
+                name: "input",
+              },
+            ],
+          });
+          const result = await new Promise((resolve) => {
+            worker.addEventListener("message", () => {
+              if (event.data.type === "done") resolve(event);
+            });
+          });
+          const data = result.data.data.MEMFS[0].data;
+          const mp3Blob = new Blob([data], { type: "audio/mp3" });
+          downloadBlob(mp3Blob, "mp3");
+          worker.terminate();
           yield "Success";
         }
 
