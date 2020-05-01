@@ -1,18 +1,20 @@
 # Bass b00ster in-browser
 
+**Unleash bass boosting [here: 1valdis.github.io/bass-booster](https://1valdis.github.io/bass-booster/)**
+
 Bass boost any audio your browser can open: usually those include WAV, AAC, FLAC, MP3, Opus, OGG Vorbis. In-browser, no upload needed. Save result as WAV file.
 
 ## Why
 
-I was bored during COVID quarantine.
+I was bored during COVID quarantine. Also suitable for meme videos.
 
 ## What next
 
 Ideally:
 
-- [ ] Solve Firefox preview issue ([#1][i1])
+- [ ] Solve Firefox preview issue? ([#1][i1])
 - [x] Realtime frequency graph
-- [ ] Save as MP3
+- [x] Save as MP3
 
 ## Notes
 
