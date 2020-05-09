@@ -151,51 +151,6 @@
           analyserNode.connect(ctx.destination);
         }
 
-        fileInput.addEventListener("change", (e) => {
-          if (!e.target.files.length) return;
-          if (previewAudio.src) {
-            URL.revokeObjectURL(previewAudio.src);
-          }
-          previewAudio.src = URL.createObjectURL(e.target.files[0]);
-          ctx.resume();
-        });
-        typeSelect.addEventListener("change", () => {
-          filterNode.type = typeSelect.options[typeSelect.selectedIndex].value;
-        });
-        frequencyInput.addEventListener("input", () => {
-          filterNode.frequency.value = +frequencyInput.value;
-        });
-        detuneInput.addEventListener("input", () => {
-          filterNode.detune.value = +detuneInput.value;
-        });
-        qInput.addEventListener("input", () => {
-          filterNode.Q.value = +qInput.value;
-        });
-        gainInput.addEventListener("input", () => {
-          filterNode.gain.value = +gainInput.value;
-        });
-        advancedButton.addEventListener("click", toggleAdvancedMode);
-        saveWavButton.addEventListener("click", async () => {
-          try {
-            for await (const status of saveWav()) {
-              savingOutput.innerText = status;
-            }
-          } catch (e) {
-            console.log(e);
-            savingOutput.innerText = "Error :(";
-          }
-        });
-        saveMp3Button.addEventListener("click", async () => {
-          try {
-            for await (const status of saveMp3()) {
-              savingOutput.innerText = status;
-            }
-          } catch (e) {
-            console.log(e);
-            savingOutput.innerText = "Error :(";
-          }
-        });
-
         function toggleAdvancedMode() {
           [
             detuneLabel,
@@ -245,28 +200,30 @@
           URL.revokeObjectURL(a.href);
         }
 
-        async function* saveWav() {
+        const logToOutput = (string) => (savingOutput.innerHTML = string);
+
+        const saveWav = async (output) => {
           if (!fileInput.files.length) return;
-          yield "Decoding audio";
+          output("Decoding audio");
           const buffer = await decodeAudio();
-          yield "Applying filter";
+          output("Applying filter");
           const resultingBuffer = await applyFilterToBuffer(buffer);
-          yield "Encoding WAV";
+          output("Encoding WAV");
           const waveBlob = await Promise.resolve(
             audioBufferToWave(resultingBuffer)
           );
           downloadBlob(waveBlob, "wav");
-          yield "Success";
-        }
+          output("Success");
+        };
 
-        // function timeToSeconds(string) {
-        //   const parts = string.split(":");
-        //   return (
-        //     60 * 60 * +parts[0] + 60 * +parts[1] + parts[2] + 0.01 * parts[3]
-        //   );
-        // }
+        const timeToSeconds = (string) => {
+          const parts = string.split(/[:\.]/g);
+          return (
+            60 * 60 * +parts[0] + 60 * +parts[1] + +parts[2] + 0.01 * +parts[3]
+          );
+        };
 
-        async function* saveMp3() {
+        const saveMp3 = async (output) => {
           if (!fileInput.files.length) return;
           let durationSeconds;
           const worker = new Worker("./ffmpeg-worker-mp4.js");
@@ -276,37 +233,37 @@
                 return resolve();
               }
               if (event.data.type === "stderr") {
-                return console.log(event.data.data);
-                // const durationInOutput = /Duration: ([^,]*)/.exec(
-                //   event.data.data
-                // );
-                // if (durationInOutput && durationInOutput[1])
-                //   durationSeconds = timeToSeconds(durationInOutput[1]);
-                // const progressInOutput = /time=([^ ]*)/.exec(
-                //   event.data.data
-                // );
-                // if (progressInOutput && progressInOutput[1]) {
-                //   progressSeconds = timeToSeconds(progressInOutput[1]);
-                //   yield `Encoding MP3 (${Math.floor(
-                //     (progressSeconds / durationSeconds) * 100
-                //   )}%)`;
-                // }
+                console.log(event.data.data);
+                const durationInOutput = /Duration: ([^,]*)/.exec(
+                  event.data.data
+                );
+                if (durationInOutput && durationInOutput[1])
+                  durationSeconds = timeToSeconds(durationInOutput[1]);
+                const progressInOutput = /time=([^ ]*)/.exec(event.data.data);
+                if (progressInOutput && progressInOutput[1]) {
+                  progressSeconds = timeToSeconds(progressInOutput[1]);
+                  output(
+                    `Encoding MP3 (${Math.floor(
+                      (progressSeconds / durationSeconds) * 100
+                    )}%)`
+                  );
+                }
               }
               console.log(event);
             });
           });
-          yield "Decoding audio";
+          output("Decoding audio");
           const buffer = await decodeAudio();
-          yield "Applying filter";
+          output("Applying filter");
           const resultingBuffer = await applyFilterToBuffer(buffer);
-          yield "Encoding WAV for conversion";
+          output("Encoding WAV for conversion");
           const waveBlob = await Promise.resolve(
             audioBufferToWave(resultingBuffer)
           );
           const arrayBuffer = await waveBlob.arrayBuffer();
-          yield "Setting up mp3 encoder (once)";
+          output("Setting up mp3 encoder (once)");
           await readyPromise;
-          yield "Encoding MP3";
+          output("Encoding MP3");
           const arguments = [
             "-i",
             "input",
@@ -339,8 +296,8 @@
           const mp3Blob = new Blob([data], { type: "audio/mp3" });
           downloadBlob(mp3Blob, "mp3");
           worker.terminate();
-          yield "Success";
-        }
+          output("Success");
+        };
 
         function audioBufferToWave(audioBuffer) {
           const length =
@@ -402,6 +359,8 @@
             pos += 4;
           }
         }
+
+        //#region frequency graph
         const canvas = $("frequencygraph");
         const canvasCtx = canvas.getContext("2d");
         function startUpdatingGraph() {
@@ -431,6 +390,50 @@
           });
         }
         startUpdatingGraph();
+        //#endregion
+
+        //#region event listeners
+        fileInput.addEventListener("change", (e) => {
+          if (!e.target.files.length) return;
+          if (previewAudio.src) {
+            URL.revokeObjectURL(previewAudio.src);
+          }
+          previewAudio.src = URL.createObjectURL(e.target.files[0]);
+          ctx.resume();
+        });
+        typeSelect.addEventListener("change", () => {
+          filterNode.type = typeSelect.options[typeSelect.selectedIndex].value;
+        });
+        frequencyInput.addEventListener("input", () => {
+          filterNode.frequency.value = +frequencyInput.value;
+        });
+        detuneInput.addEventListener("input", () => {
+          filterNode.detune.value = +detuneInput.value;
+        });
+        qInput.addEventListener("input", () => {
+          filterNode.Q.value = +qInput.value;
+        });
+        gainInput.addEventListener("input", () => {
+          filterNode.gain.value = +gainInput.value;
+        });
+        advancedButton.addEventListener("click", toggleAdvancedMode);
+        saveWavButton.addEventListener("click", async () => {
+          try {
+            await saveWav(logToOutput);
+          } catch (e) {
+            console.log(e);
+            logToOutput("Error :(");
+          }
+        });
+        saveMp3Button.addEventListener("click", async () => {
+          try {
+            await saveMp3(logToOutput);
+          } catch (e) {
+            console.log(e);
+            logToOutput("Error :(");
+          }
+        });
+        //#endregion
       })();
     </script>
   </body>
