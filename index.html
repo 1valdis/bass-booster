@@ -1,440 +1,424 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Bass b00ster in browser</title>
-    <style>
-      * {
-        margin: 0;
-        padding: 0;
-      }
-      input[type="file"],
-      audio,
-      button,
-      output {
-        grid-column: 1 / -1;
-        min-width: 100%;
-      }
-      .settings {
-        display: grid;
-        width: 30rem;
-        grid: auto-flow / repeat(2, 1fr);
-        gap: 1rem;
-        padding: 1rem;
-      }
-      .settings * {
-        max-width: 100%;
-      }
-      .hidden {
-        display: none;
-      }
-    </style>
-  </head>
-  <body>
-    <section class="settings">
-      <input type="file" id="input" accept="audio/*" />
-      <audio id="preview" controls></audio>
-      <label for="frequency">Frequency of bass (less or equal):</label>
-      <input
-        type="number"
-        min="1"
-        max="11025"
-        step="10"
-        value="230"
-        id="frequency"
-      />
-      <label for="gain">Amplification (dB): </label>
-      <input type="number" min="0" max="40" step="any" value="18" id="gain" />
-      <label for="detune" class="hidden">Detune:</label>
-      <input
-        type="number"
-        min="0"
-        max="2000"
-        step="any"
-        value="650"
-        id="detune"
-        class="hidden"
-      />
-      <label for="q" class="hidden">Q: </label>
-      <input
-        type="number"
-        min="0.0001"
-        max="1000"
-        step="any"
-        value="1"
-        id="q"
-        class="hidden"
-      />
-      <label for="type" class="hidden">Type</label>
-      <select id="type" class="hidden">
-        <option>lowpass</option>
-        <option>highpass</option>
-        <option>bandpass</option>
-        <option selected>lowshelf</option>
-        <option>highshelf</option>
-        <option>peaking</option>
-        <option>notch</option>
-        <option>allpass</option>
-      </select>
-      <button id="advanced">Advanced mode</button>
-      <button id="savewav">Save as WAV (fast)</button>
-      <button id="savemp3">Save as MP3 (slow)</button>
-      <output id="saving"></output>
-    </section>
-    <section class="frequency">
-      <canvas id="frequencygraph" width="512" height="256"></canvas>
-    </section>
 
-    <!-- <select id="preset"> </select> -->
-    <script>
-      (async () => {
-        const $ = (id) => document.getElementById(id);
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bass b00ster in browser</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+    }
 
-        const previewAudio = $("preview");
-        const fileInput = $("input");
-        const typeLabel = document.querySelector('label[for="type"]');
-        const typeSelect = $("type"); // lowshelf
-        const frequencyInput = $("frequency"); // 230
-        const detuneLabel = document.querySelector('label[for="detune"]');
-        const detuneInput = $("detune"); // 650
-        const qLabel = document.querySelector('label[for="q"]');
-        const qInput = $("q"); // 63
-        const gainInput = $("gain"); // 18
-        const advancedButton = $("advanced");
-        const saveWavButton = $("savewav");
-        const saveMp3Button = $("savemp3");
-        const savingOutput = $("saving");
+    input[type="file"],
+    audio,
+    button,
+    output {
+      grid-column: 1 / -1;
+      min-width: 100%;
+    }
 
-        const ctx = new AudioContext();
-        const previewNode = ctx.createMediaElementSource(previewAudio);
-        const filterNode = ctx.createBiquadFilter();
-        filterNode.type = "lowshelf";
-        filterNode.frequency.value = 230;
-        filterNode.detune.value = 650;
-        filterNode.gain.value = 18;
-        previewNode.connect(filterNode);
-        const analyserNode = ctx.createAnalyser();
-        analyserNode.smoothingTimeConstant = 0.5;
-        analyserNode.fftSize = 1024;
-        analyserNode.maxDecibels = 0;
+    .settings {
+      display: grid;
+      width: 30rem;
+      grid: auto-flow / repeat(2, 1fr);
+      gap: 1rem;
+      padding: 1rem;
+    }
 
-        if (ctx.audioWorklet) {
-          const workletCode = `
+    .settings * {
+      max-width: 100%;
+    }
+
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+  <section class="settings">
+    <input type="file" id="input" accept="audio/*" />
+    <audio id="preview" controls></audio>
+    <label for="frequency">Frequency of bass (less or equal):</label>
+    <input type="number" min="1" max="11025" step="10" value="230" id="frequency" />
+    <label for="gain">Amplification (dB): </label>
+    <input type="number" min="0" max="40" step="any" value="18" id="gain" />
+    <label for="detune" class="hidden">Detune:</label>
+    <input type="number" min="0" max="2000" step="any" value="650" id="detune" class="hidden" />
+    <label for="q" class="hidden">Q: </label>
+    <input type="number" min="0.0001" max="1000" step="any" value="1" id="q" class="hidden" />
+    <label for="type" class="hidden">Type</label>
+    <select id="type" class="hidden">
+      <option>lowpass</option>
+      <option>highpass</option>
+      <option>bandpass</option>
+      <option selected>lowshelf</option>
+      <option>highshelf</option>
+      <option>peaking</option>
+      <option>notch</option>
+      <option>allpass</option>
+    </select>
+    <button id="advanced">Advanced mode</button>
+    <button id="savewav">Save as WAV (fast)</button>
+    <button id="savemp3">Save as MP3 (slow)</button>
+    <output id="saving"></output>
+  </section>
+  <section class="frequency">
+    <canvas id="frequencygraph" width="512" height="256"></canvas>
+  </section>
+
+  <!-- <select id="preset"> </select> -->
+  <script>
+    (async () => {
+      const $ = (id) => document.getElementById(id);
+
+      const previewAudio = $("preview");
+      const fileInput = $("input");
+      const typeLabel = document.querySelector('label[for="type"]');
+      const typeSelect = $("type"); // lowshelf
+      const frequencyInput = $("frequency"); // 230
+      const detuneLabel = document.querySelector('label[for="detune"]');
+      const detuneInput = $("detune"); // 650
+      const qLabel = document.querySelector('label[for="q"]');
+      const qInput = $("q"); // 63
+      const gainInput = $("gain"); // 18
+      const advancedButton = $("advanced");
+      const saveWavButton = $("savewav");
+      const saveMp3Button = $("savemp3");
+      const savingOutput = $("saving");
+
+      const ctx = new AudioContext();
+      const previewNode = ctx.createMediaElementSource(previewAudio);
+      const filterNode = ctx.createBiquadFilter();
+      filterNode.type = "lowshelf";
+      filterNode.frequency.value = 230;
+      filterNode.detune.value = 650;
+      filterNode.gain.value = 18;
+      previewNode.connect(filterNode);
+      const analyserNode = ctx.createAnalyser();
+      analyserNode.smoothingTimeConstant = 0.5;
+      analyserNode.fftSize = 1024;
+      analyserNode.maxDecibels = 0;
+
+      if (ctx.audioWorklet) {
+        const workletCode = `
             class ClampProcessor extends AudioWorkletProcessor {
               process (inputs, outputs, parameters) {
                 for (let o = 0; o < outputs.length; o++) {
                   for (let c = 0; c < outputs[o].length; c++) {
                     for (let s = 0; s < outputs[o][c].length; s++) {
-                      outputs[o][c][s] = Math.max(-1, Math.min(1, inputs[o][c][s]));
+                      if (inputs[o]?.[c]?.[s])
+                        outputs[o][c][s] = Math.max(-1, Math.min(1, inputs[o][c][s]));
                     }
                   }
                 }
-
                 return true;
               }
             }
             registerProcessor('clamp-processor', ClampProcessor)
           `;
-          await ctx.audioWorklet.addModule(
-            URL.createObjectURL(
-              new Blob([workletCode], { type: "text/javascript" })
-            )
-          );
-          const clampNode = new AudioWorkletNode(ctx, "clamp-processor");
-          clampNode.onprocessorerror = console.log;
-          filterNode.connect(clampNode);
-          clampNode.connect(analyserNode);
-          analyserNode.connect(ctx.destination);
-        } else {
-          filterNode.connect(analyserNode);
-          analyserNode.connect(ctx.destination);
-        }
+        await ctx.audioWorklet.addModule(
+          URL.createObjectURL(
+            new Blob([workletCode], { type: "text/javascript" })
+          )
+        );
+        const clampNode = new AudioWorkletNode(ctx, "clamp-processor");
+        clampNode.onprocessorerror = console.log;
+        filterNode.connect(clampNode);
+        clampNode.connect(analyserNode);
+        analyserNode.connect(ctx.destination);
+      } else {
+        filterNode.connect(analyserNode);
+        analyserNode.connect(ctx.destination);
+      }
 
-        function toggleAdvancedMode() {
-          [
-            detuneLabel,
-            detuneInput,
-            qLabel,
-            qInput,
-            typeLabel,
-            typeLabel,
-          ].forEach((el) => el.classList.toggle("hidden"));
-        }
+      function toggleAdvancedMode() {
+        [
+          detuneLabel,
+          detuneInput,
+          qLabel,
+          qInput,
+          typeLabel,
+          typeLabel,
+        ].forEach((el) => el.classList.toggle("hidden"));
+      }
 
-        async function decodeAudio() {
-          const reader = new FileReader();
-          reader.readAsArrayBuffer(fileInput.files[0]);
-          return new Promise((resolve) => {
-            reader.addEventListener("load", (e) => {
-              resolve(ctx.decodeAudioData(e.target.result));
-            });
+      async function decodeAudio() {
+        const reader = new FileReader();
+        reader.readAsArrayBuffer(fileInput.files[0]);
+        return new Promise((resolve) => {
+          reader.addEventListener("load", (e) => {
+            resolve(ctx.decodeAudioData(e.target.result));
           });
-        }
+        });
+      }
 
-        async function applyFilterToBuffer(buffer) {
-          const offlineCtx = new OfflineAudioContext({
-            numberOfChannels: buffer.numberOfChannels,
-            sampleRate: buffer.sampleRate,
-            length: buffer.length,
-          });
-          const bufferNode = offlineCtx.createBufferSource();
-          bufferNode.buffer = buffer;
-          bufferNode.start();
-          const filterNode = offlineCtx.createBiquadFilter();
-          filterNode.type = typeSelect.options[typeSelect.selectedIndex].value;
-          filterNode.frequency.value = +frequencyInput.value;
-          filterNode.detune.value = +detuneInput.value;
-          filterNode.Q.value = +qInput.value;
-          filterNode.gain.value = +gainInput.value;
-          bufferNode.connect(filterNode);
-          filterNode.connect(offlineCtx.destination);
-          return offlineCtx.startRendering();
-        }
+      async function applyFilterToBuffer(buffer) {
+        const offlineCtx = new OfflineAudioContext({
+          numberOfChannels: buffer.numberOfChannels,
+          sampleRate: buffer.sampleRate,
+          length: buffer.length,
+        });
+        const bufferNode = offlineCtx.createBufferSource();
+        bufferNode.buffer = buffer;
+        bufferNode.start();
+        const filterNode = offlineCtx.createBiquadFilter();
+        filterNode.type = typeSelect.options[typeSelect.selectedIndex].value;
+        filterNode.frequency.value = +frequencyInput.value;
+        filterNode.detune.value = +detuneInput.value;
+        filterNode.Q.value = +qInput.value;
+        filterNode.gain.value = +gainInput.value;
+        bufferNode.connect(filterNode);
+        filterNode.connect(offlineCtx.destination);
+        return offlineCtx.startRendering();
+      }
 
-        function downloadBlob(blob, type) {
-          const a = document.createElement("a");
-          a.href = URL.createObjectURL(blob);
-          a.download = `${fileInput.files[0].name}-bass-b00sted.${type}`;
-          a.click();
-          URL.revokeObjectURL(a.href);
-        }
+      function downloadBlob(blob, type) {
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `${fileInput.files[0].name}-bass-b00sted.${type}`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+      }
 
-        const logToOutput = (string) => (savingOutput.innerHTML = string);
+      const logToOutput = (string) => (savingOutput.innerHTML = string);
 
-        const saveWav = async (output) => {
-          if (!fileInput.files.length) return;
-          output("Decoding audio");
-          const buffer = await decodeAudio();
-          output("Applying filter");
-          const resultingBuffer = await applyFilterToBuffer(buffer);
-          output("Encoding WAV");
-          const waveBlob = await Promise.resolve(
-            audioBufferToWave(resultingBuffer)
-          );
-          downloadBlob(waveBlob, "wav");
-          output("Success");
-        };
+      const saveWav = async (output) => {
+        if (!fileInput.files.length) return;
+        output("Decoding audio");
+        const buffer = await decodeAudio();
+        output("Applying filter");
+        const resultingBuffer = await applyFilterToBuffer(buffer);
+        output("Encoding WAV");
+        const waveBlob = await Promise.resolve(
+          audioBufferToWave(resultingBuffer)
+        );
+        downloadBlob(waveBlob, "wav");
+        output("Success");
+      };
 
-        const timeToSeconds = (string) => {
-          const parts = string.split(/[:\.]/g);
-          return (
-            60 * 60 * +parts[0] + 60 * +parts[1] + +parts[2] + 0.01 * +parts[3]
-          );
-        };
+      const timeToSeconds = (string) => {
+        const parts = string.split(/[:\.]/g);
+        return (
+          60 * 60 * +parts[0] + 60 * +parts[1] + +parts[2] + 0.01 * +parts[3]
+        );
+      };
 
-        const saveMp3 = async (output) => {
-          if (!fileInput.files.length) return;
-          let durationSeconds;
-          const worker = new Worker("./ffmpeg-worker-mp4.js");
-          const readyPromise = new Promise((resolve) => {
-            worker.addEventListener("message", (event) => {
-              if (event.data.type === "ready") {
-                return resolve();
-              }
-              if (event.data.type === "stderr") {
-                console.log(event.data.data);
-                const durationInOutput = /Duration: ([^,]*)/.exec(
-                  event.data.data
-                );
-                if (durationInOutput && durationInOutput[1])
-                  durationSeconds = timeToSeconds(durationInOutput[1]);
-                const progressInOutput = /time=([^ ]*)/.exec(event.data.data);
-                if (progressInOutput && progressInOutput[1]) {
-                  progressSeconds = timeToSeconds(progressInOutput[1]);
-                  output(
-                    `Encoding MP3 (${Math.floor(
-                      (progressSeconds / durationSeconds) * 100
-                    )}%)`
-                  );
-                }
-              }
-              console.log(event);
-            });
-          });
-          output("Decoding audio");
-          const buffer = await decodeAudio();
-          output("Applying filter");
-          const resultingBuffer = await applyFilterToBuffer(buffer);
-          output("Encoding WAV for conversion");
-          const waveBlob = await Promise.resolve(
-            audioBufferToWave(resultingBuffer)
-          );
-          const arrayBuffer = await waveBlob.arrayBuffer();
-          output("Setting up mp3 encoder (once)");
-          await readyPromise;
-          output("Encoding MP3");
-          const arguments = [
-            "-i",
-            "input",
-            "-ab",
-            "320k",
-            "-ar",
-            "44100",
-            "-ac",
-            "2",
-            "-acodec",
-            "libmp3lame",
-            "output.mp3",
-          ];
-          worker.postMessage({
-            type: "run",
-            arguments,
-            MEMFS: [
-              {
-                data: new Uint8Array(arrayBuffer),
-                name: "input",
-              },
-            ],
-          });
-          const result = await new Promise((resolve) => {
-            worker.addEventListener("message", () => {
-              if (event.data.type === "done") resolve(event);
-            });
-          });
-          const data = result.data.data.MEMFS[0].data;
-          const mp3Blob = new Blob([data], { type: "audio/mp3" });
-          downloadBlob(mp3Blob, "mp3");
-          worker.terminate();
-          output("Success");
-        };
-
-        function audioBufferToWave(audioBuffer) {
-          const length =
-            audioBuffer.length * audioBuffer.numberOfChannels * 2 + 44;
-          const arrayBuffer = new ArrayBuffer(length);
-          const view = new DataView(arrayBuffer);
-
-          var channels = [];
-
-          let pos = 0;
-
-          // write WAVE header
-          setUint32(0x46464952); // "RIFF"
-          setUint32(length - 8); // file length - 8
-          setUint32(0x45564157); // "WAVE"
-
-          setUint32(0x20746d66); // "fmt " chunk
-          setUint32(16); // length = 16
-          setUint16(1); // PCM (uncompressed)
-          setUint16(audioBuffer.numberOfChannels);
-          setUint32(audioBuffer.sampleRate);
-          setUint32(audioBuffer.sampleRate * 2 * audioBuffer.numberOfChannels); // avg. bytes/sec
-          setUint16(audioBuffer.numberOfChannels * 2); // block-align
-          setUint16(16); // 16 bits per sample
-
-          setUint32(0x61746164); // "data" - chunk
-          setUint32(length - pos - 4); // data size: file size - 44 bytes
-
-          // split channels
-          for (let i = 0; i < audioBuffer.numberOfChannels; i++) {
-            channels.push(audioBuffer.getChannelData(i));
-          }
-
-          // write interleaved
-          let offset = 0;
-          while (pos < length) {
-            for (let i = 0; i < audioBuffer.numberOfChannels; i++) {
-              // interleave channels
-              let sample = Math.max(-1, Math.min(1, channels[i][offset])); // clamp
-              // let sample = channels[i][offset];
-              sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0; // scale to 16-bit signed int (???)
-              // sample *= 32768;
-              view.setInt16(pos, sample, true); // update data chunk
-              pos += 2;
+      const saveMp3 = async (output) => {
+        if (!fileInput.files.length) return;
+        let durationSeconds;
+        const worker = new Worker("./ffmpeg-worker-mp4.js");
+        const readyPromise = new Promise((resolve) => {
+          worker.addEventListener("message", (event) => {
+            if (event.data.type === "ready") {
+              return resolve();
             }
-            offset++; // next source sample
-          }
+            if (event.data.type === "stderr") {
+              console.log(event.data.data);
+              const durationInOutput = /Duration: ([^,]*)/.exec(
+                event.data.data
+              );
+              if (durationInOutput && durationInOutput[1])
+                durationSeconds = timeToSeconds(durationInOutput[1]);
+              const progressInOutput = /time=([^ ]*)/.exec(event.data.data);
+              if (progressInOutput && progressInOutput[1]) {
+                progressSeconds = timeToSeconds(progressInOutput[1]);
+                output(
+                  `Encoding MP3 (${Math.floor(
+                    (progressSeconds / durationSeconds) * 100
+                  )}%)`
+                );
+              }
+            }
+            console.log(event);
+          });
+        });
+        output("Decoding audio");
+        const buffer = await decodeAudio();
+        output("Applying filter");
+        const resultingBuffer = await applyFilterToBuffer(buffer);
+        output("Encoding WAV for conversion");
+        const waveBlob = await Promise.resolve(
+          audioBufferToWave(resultingBuffer)
+        );
+        const arrayBuffer = await waveBlob.arrayBuffer();
+        output("Setting up mp3 encoder (once)");
+        await readyPromise;
+        output("Encoding MP3");
+        const arguments = [
+          "-i",
+          "input",
+          "-ab",
+          "320k",
+          "-ar",
+          "44100",
+          "-ac",
+          "2",
+          "-acodec",
+          "libmp3lame",
+          "output.mp3",
+        ];
+        worker.postMessage({
+          type: "run",
+          arguments,
+          MEMFS: [
+            {
+              data: new Uint8Array(arrayBuffer),
+              name: "input",
+            },
+          ],
+        });
+        const result = await new Promise((resolve) => {
+          worker.addEventListener("message", () => {
+            if (event.data.type === "done") resolve(event);
+          });
+        });
+        const data = result.data.data.MEMFS[0].data;
+        const mp3Blob = new Blob([data], { type: "audio/mp3" });
+        downloadBlob(mp3Blob, "mp3");
+        worker.terminate();
+        output("Success");
+      };
 
-          // create Blob
-          return new Blob([arrayBuffer], { type: "audio/wav" });
+      function audioBufferToWave(audioBuffer) {
+        const length =
+          audioBuffer.length * audioBuffer.numberOfChannels * 2 + 44;
+        const arrayBuffer = new ArrayBuffer(length);
+        const view = new DataView(arrayBuffer);
 
-          function setUint16(data) {
-            view.setUint16(pos, data, true);
+        var channels = [];
+
+        let pos = 0;
+
+        // write WAVE header
+        setUint32(0x46464952); // "RIFF"
+        setUint32(length - 8); // file length - 8
+        setUint32(0x45564157); // "WAVE"
+
+        setUint32(0x20746d66); // "fmt " chunk
+        setUint32(16); // length = 16
+        setUint16(1); // PCM (uncompressed)
+        setUint16(audioBuffer.numberOfChannels);
+        setUint32(audioBuffer.sampleRate);
+        setUint32(audioBuffer.sampleRate * 2 * audioBuffer.numberOfChannels); // avg. bytes/sec
+        setUint16(audioBuffer.numberOfChannels * 2); // block-align
+        setUint16(16); // 16 bits per sample
+
+        setUint32(0x61746164); // "data" - chunk
+        setUint32(length - pos - 4); // data size: file size - 44 bytes
+
+        // split channels
+        for (let i = 0; i < audioBuffer.numberOfChannels; i++) {
+          channels.push(audioBuffer.getChannelData(i));
+        }
+
+        // write interleaved
+        let offset = 0;
+        while (pos < length) {
+          for (let i = 0; i < audioBuffer.numberOfChannels; i++) {
+            // interleave channels
+            let sample = Math.max(-1, Math.min(1, channels[i][offset])); // clamp
+            // let sample = channels[i][offset];
+            sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0; // scale to 16-bit signed int (???)
+            // sample *= 32768;
+            view.setInt16(pos, sample, true); // update data chunk
             pos += 2;
           }
-
-          function setUint32(data) {
-            view.setUint32(pos, data, true);
-            pos += 4;
-          }
+          offset++; // next source sample
         }
 
-        //#region frequency graph
-        const canvas = $("frequencygraph");
-        const canvasCtx = canvas.getContext("2d");
-        function startUpdatingGraph() {
-          requestAnimationFrame(() => {
-            const frequencyData = new Uint8Array(
-              analyserNode.frequencyBinCount
-            );
-            analyserNode.getByteFrequencyData(frequencyData);
-            const imageData = new ImageData(canvas.width, canvas.height);
-            const buffer = new ArrayBuffer(imageData.data.length);
-            const buf8 = new Uint8ClampedArray(buffer);
-            const data = new Uint32Array(buffer);
+        // create Blob
+        return new Blob([arrayBuffer], { type: "audio/wav" });
 
-            for (let i = 0; i < frequencyData.length; i++) {
-              const value = frequencyData[i];
-              data[frequencyData.length * (255 - value) + i] =
-                (255 << 24) | // alpha
-                (255 << 16) | // blue
-                (0 << 8) | // green
-                0; // red
-            }
-
-            imageData.data.set(buf8);
-            canvasCtx.putImageData(imageData, 0, 0);
-
-            requestAnimationFrame(startUpdatingGraph);
-          });
+        function setUint16(data) {
+          view.setUint16(pos, data, true);
+          pos += 2;
         }
-        startUpdatingGraph();
-        //#endregion
 
-        //#region event listeners
-        fileInput.addEventListener("change", (e) => {
-          if (!e.target.files.length) return;
-          if (previewAudio.src) {
-            URL.revokeObjectURL(previewAudio.src);
+        function setUint32(data) {
+          view.setUint32(pos, data, true);
+          pos += 4;
+        }
+      }
+
+      //#region frequency graph
+      const canvas = $("frequencygraph");
+      const canvasCtx = canvas.getContext("2d");
+      function startUpdatingGraph() {
+        requestAnimationFrame(() => {
+          const frequencyData = new Uint8Array(
+            analyserNode.frequencyBinCount
+          );
+          analyserNode.getByteFrequencyData(frequencyData);
+          const imageData = new ImageData(canvas.width, canvas.height);
+          const buffer = new ArrayBuffer(imageData.data.length);
+          const buf8 = new Uint8ClampedArray(buffer);
+          const data = new Uint32Array(buffer);
+
+          for (let i = 0; i < frequencyData.length; i++) {
+            const value = frequencyData[i];
+            data[frequencyData.length * (255 - value) + i] =
+              (255 << 24) | // alpha
+              (255 << 16) | // blue
+              (0 << 8) | // green
+              0; // red
           }
-          previewAudio.src = URL.createObjectURL(e.target.files[0]);
-          ctx.resume();
+
+          imageData.data.set(buf8);
+          canvasCtx.putImageData(imageData, 0, 0);
+
+          requestAnimationFrame(startUpdatingGraph);
         });
-        typeSelect.addEventListener("change", () => {
-          filterNode.type = typeSelect.options[typeSelect.selectedIndex].value;
-        });
-        frequencyInput.addEventListener("input", () => {
-          filterNode.frequency.value = +frequencyInput.value;
-        });
-        detuneInput.addEventListener("input", () => {
-          filterNode.detune.value = +detuneInput.value;
-        });
-        qInput.addEventListener("input", () => {
-          filterNode.Q.value = +qInput.value;
-        });
-        gainInput.addEventListener("input", () => {
-          filterNode.gain.value = +gainInput.value;
-        });
-        advancedButton.addEventListener("click", toggleAdvancedMode);
-        saveWavButton.addEventListener("click", async () => {
-          try {
-            await saveWav(logToOutput);
-          } catch (e) {
-            console.log(e);
-            logToOutput("Error :(");
-          }
-        });
-        saveMp3Button.addEventListener("click", async () => {
-          try {
-            await saveMp3(logToOutput);
-          } catch (e) {
-            console.log(e);
-            logToOutput("Error :(");
-          }
-        });
-        //#endregion
-      })();
-    </script>
-  </body>
+      }
+      startUpdatingGraph();
+      //#endregion
+
+      //#region event listeners
+      fileInput.addEventListener("change", (e) => {
+        if (!e.target.files.length) return;
+        if (previewAudio.src) {
+          URL.revokeObjectURL(previewAudio.src);
+        }
+        previewAudio.src = URL.createObjectURL(e.target.files[0]);
+        ctx.resume();
+      });
+      typeSelect.addEventListener("change", () => {
+        filterNode.type = typeSelect.options[typeSelect.selectedIndex].value;
+      });
+      frequencyInput.addEventListener("input", () => {
+        filterNode.frequency.value = +frequencyInput.value;
+      });
+      detuneInput.addEventListener("input", () => {
+        filterNode.detune.value = +detuneInput.value;
+      });
+      qInput.addEventListener("input", () => {
+        filterNode.Q.value = +qInput.value;
+      });
+      gainInput.addEventListener("input", () => {
+        filterNode.gain.value = +gainInput.value;
+      });
+      advancedButton.addEventListener("click", toggleAdvancedMode);
+      saveWavButton.addEventListener("click", async () => {
+        try {
+          await saveWav(logToOutput);
+        } catch (e) {
+          console.log(e);
+          logToOutput("Error :(");
+        }
+      });
+      saveMp3Button.addEventListener("click", async () => {
+        try {
+          await saveMp3(logToOutput);
+        } catch (e) {
+          console.log(e);
+          logToOutput("Error :(");
+        }
+      });
+      //#endregion
+    })();
+  </script>
+</body>
+
 </html>
