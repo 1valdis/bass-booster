@@ -12,7 +12,7 @@ I was bored during COVID quarantine. Also suitable for meme videos.
 
 Ideally:
 
-- [ ] Solve Firefox preview issue? ([#1][i1])
+- [x] Solve Firefox preview issue? ([#1][i1])
 - [x] Realtime frequency graph
 - [x] Save as MP3
 
