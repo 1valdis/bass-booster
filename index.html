@@ -282,6 +282,7 @@
         output("Success");
       };
 
+      // source: https://stackoverflow.com/a/30045041
       function audioBufferToWave(audioBuffer) {
         const length =
           audioBuffer.length * audioBuffer.numberOfChannels * 2 + 44;
@@ -320,9 +321,7 @@
           for (let i = 0; i < audioBuffer.numberOfChannels; i++) {
             // interleave channels
             let sample = Math.max(-1, Math.min(1, channels[i][offset])); // clamp
-            // let sample = channels[i][offset];
-            sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0; // scale to 16-bit signed int (???)
-            // sample *= 32768;
+            sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0; // scale to 16-bit signed int
             view.setInt16(pos, sample, true); // update data chunk
             pos += 2;
           }
