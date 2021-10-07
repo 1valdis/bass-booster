@@ -4,20 +4,21 @@
 
 Bass boost any audio your browser can open: usually those include WAV, AAC, FLAC, MP3, Opus, OGG Vorbis. In-browser, no upload needed. Save result as WAV file.
 
-## Why
+## Features
+
+- bass boost up to specific frequency and with specific amount of distortion
+- realtime frequency graph
+- save as MP3 320kbps or WAV
+
+### Why
 
 I was bored during COVID quarantine. Also suitable for meme videos.
 
-## What next
+### What next
+Idk, any ideas? Put up an issue :)
 
-Ideally:
+### Notes
 
-- [x] Solve Firefox preview issue? ([#1][i1])
-- [x] Realtime frequency graph
-- [x] Save as MP3
-
-## Notes
-
-Developed for latest Chrome (81 as of the time of writing), should also work on others latest ~~Chrome copies~~ Webkit-based browsers (Opera, Edge, whatever). Firefox's preview is messed up (some kind of compression is applied, which prevents hearing bass boost distortions), but the resulting WAV is correct.
+Developed for latest Chrome (81 as of the time of writing), should also work on others latest ~~Chrome copies~~ Webkit-based browsers (Opera, Edge, whatever). Also works on Firefox since recently. Not tested on anything else.
 
 [i1]: https://github.com/1valdis/bass-booster/issues/1
