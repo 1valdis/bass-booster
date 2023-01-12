@@ -2,7 +2,7 @@
 
 **Unleash bass boosting [here: 1valdis.github.io/bass-booster](https://1valdis.github.io/bass-booster/)**
 
-Bass boost any audio your browser can open: usually those include WAV, AAC, FLAC, MP3, Opus, OGG Vorbis. In-browser, no upload needed. Save result as WAV file.
+Bass boost any audio your browser can open: usually those include WAV, AAC, FLAC, MP3, Opus, OGG Vorbis. In-browser, no upload needed. Save result as WAV or MP3 file.
 
 ## Features
 
